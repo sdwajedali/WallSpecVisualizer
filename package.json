@@ -19,6 +19,7 @@
     "zustand": "^4.4.0"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.0.14",
     "@types/react-dropzone": "^5.1.0",
