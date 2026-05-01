@@ -6,9 +6,6 @@ export type ActiveElement = 'wall' | 'ceiling' | 'trim'
 
 export interface WallConfig {
   id: string
-  photo: File | null
-  photoPreviewUrl: string | null
-  extractedPalette: Color[]
   pattern: WallPattern
   solidColor: Color | null
   upperColor: Color | null
@@ -18,6 +15,9 @@ export interface WallConfig {
   middleColor: Color | null
   bottomColor: Color | null
   stripePercentage: number
+  photo?: File | null
+  photoPreviewUrl?: string | null
+  extractedPalette?: Color[]
 }
 
 export interface RoomStore {
@@ -33,8 +33,6 @@ export interface RoomStore {
   setWallCount: (count: number) => void
   setActiveWallId: (id: string | null) => void
   setActiveElement: (type: ActiveElement) => void
-  updateWallPhoto: (wallId: string, file: File, previewUrl: string) => void
-  setWallPalette: (wallId: string, palette: Color[]) => void
   setWallPattern: (wallId: string, pattern: WallPattern) => void
   setWallColorField: (wallId: string, field: keyof Omit<WallConfig, 'id' | 'photo' | 'photoPreviewUrl' | 'extractedPalette' | 'pattern' | 'splitPercentage' | 'stripePercentage'>, color: Color) => void
   setSplitPercentage: (wallId: string, value: number) => void
@@ -51,9 +49,6 @@ const defaultColor: Color = {
 
 const createWall = (index: number): WallConfig => ({
   id: `wall-${index}`,
-  photo: null,
-  photoPreviewUrl: null,
-  extractedPalette: [],
   pattern: 'solid',
   solidColor: defaultColor,
   upperColor: defaultColor,
@@ -85,37 +80,6 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
   setActiveWallId: (id) => set({ activeWallId: id, activeElement: 'wall' }),
   setActiveElement: (type) => set({ activeElement: type, activeWallId: type === 'wall' ? get().activeWallId : null }),
-  updateWallPhoto: (wallId, file, previewUrl) =>
-    set((state) => ({
-      walls: state.walls.map((wall) =>
-        wall.id === wallId
-          ? {
-              ...wall,
-              photo: file,
-              photoPreviewUrl: previewUrl
-            }
-          : wall
-      ),
-      version: state.version + 1
-    })),
-  setWallPalette: (wallId, palette) =>
-    set((state) => ({
-      walls: state.walls.map((wall) =>
-        wall.id === wallId
-          ? {
-              ...wall,
-              extractedPalette: palette,
-              solidColor: palette[0] ?? wall.solidColor,
-              upperColor: palette[0] ?? wall.upperColor,
-              lowerColor: palette[1] ?? palette[0] ?? wall.lowerColor,
-              topColor: palette[0] ?? wall.topColor,
-              middleColor: palette[1] ?? palette[1] ?? wall.middleColor,
-              bottomColor: palette[2] ?? palette[0] ?? wall.bottomColor
-            }
-          : wall
-      ),
-      version: state.version + 1
-    })),
   setWallPattern: (wallId, pattern) =>
     set((state) => ({
       walls: state.walls.map((wall) =>

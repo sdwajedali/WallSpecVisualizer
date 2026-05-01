@@ -104,25 +104,31 @@ export function ColorEditor() {
   const setStripePercentage = useRoomStore((state) => state.setStripePercentage)
   const setCeilingColor = useRoomStore((state) => state.setCeilingColor)
   const setTrimColor = useRoomStore((state) => state.setTrimColor)
+  const setActiveWallId = useRoomStore((state) => state.setActiveWallId)
+  const setActiveElement = useRoomStore((state) => state.setActiveElement)
 
   const activeWall = useMemo(
     () => walls.find((wall) => wall.id === activeWallId) ?? null,
     [walls, activeWallId]
   )
 
-  const palette = useMemo(() => {
-    if (activeWall?.extractedPalette.length) {
-      return activeWall.extractedPalette
-    }
-    const combined = walls.slice(0, wallCount).flatMap((wall) => wall.extractedPalette)
-    return combined.length ? combined : defaultPalette
-  }, [activeWall, walls, wallCount])
+  const palette = useMemo(() => defaultPalette, [])
 
   const [editingKey, setEditingKey] = useState<ColorFieldKey | null>(null)
   const [editingSpecial, setEditingSpecial] = useState<SpecialArea | null>(null)
   const [editorHsl, setEditorHsl] = useState<HslValues>({ h: 0, s: 0, l: 0 })
   const [pickerTab, setPickerTab] = useState<'wheel' | 'hsl'>('wheel')
   const [openCommonSection, setOpenCommonSection] = useState<CommonToneKey>('light')
+  const [openColorFields, setOpenColorFields] = useState<Set<ColorFieldKey>>(
+    () => new Set(['upperColor', 'lowerColor', 'topColor', 'middleColor', 'bottomColor'] as ColorFieldKey[])
+  )
+  const toggleColorField = (field: ColorFieldKey) =>
+    setOpenColorFields((prev) => {
+      const next = new Set(prev)
+      if (next.has(field)) next.delete(field)
+      else next.add(field)
+      return next
+    })
 
   useEffect(() => {
     if (editingKey && activeWall) {
@@ -205,12 +211,6 @@ export function ColorEditor() {
     setWallColorField(activeWall.id, field, extracted)
     setEditorHsl(extracted.hsl)
   }
-
-  const combinedPalette = useMemo(() => {
-    const unique = new Map<string, Color>()
-    palette.forEach((color) => unique.set(color.hex, color))
-    return Array.from(unique.values()).slice(0, 8)
-  }, [palette])
 
   const specialColor = editingSpecial === 'ceiling' ? ceilingColor : editingSpecial === 'trim' ? trimColor : null
 
@@ -413,11 +413,63 @@ export function ColorEditor() {
     </Popover.Root>
   )
 
+  const [isPanelOpen, setIsPanelOpen] = useState(true)
+
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Pattern & Color Editor</h2>
-        <p className="mt-1 text-xs text-slate-500">Edit the active wall, ceiling, or trim using extracted paint colors.</p>
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-soft">
+      <button
+        type="button"
+        onClick={() => setIsPanelOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-2"
+      >
+        <div className="text-left">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Pattern &amp; Color Editor</h2>
+          <p className="mt-0.5 text-xs text-slate-500">Edit the active wall, ceiling, or trim.</p>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {isPanelOpen && <div className="mt-4">
+
+      {/* Element selector tabs */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {walls.slice(0, wallCount).map((wall, idx) => (
+          <button
+            key={wall.id}
+            type="button"
+            onClick={() => { setActiveWallId(wall.id) }}
+            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+              activeElement === 'wall' && activeWallId === wall.id
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Wall {idx + 1}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setActiveElement('ceiling')}
+          className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+            activeElement === 'ceiling'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Ceiling
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveElement('trim')}
+          className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+            activeElement === 'trim'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Trim
+        </button>
       </div>
 
       {activeElement === 'wall' && activeWall ? (
@@ -456,10 +508,6 @@ export function ColorEditor() {
             <div className="space-y-4">
               <label className="text-sm font-semibold text-slate-700">Solid Color</label>
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">From Photo</div>
-                {renderColorSwatches(combinedPalette, getFieldColor('solidColor').hex, (color) => handlePaletteSelect('solidColor', color), 'h-12 w-12 rounded-2xl')}
-              </div>
-              <div>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Common Wall Colors · {commonWallPalette.length}</div>
                 {renderCommonSectionPanels(
                   getFieldColor('solidColor').hex,
@@ -478,110 +526,115 @@ export function ColorEditor() {
           )}
 
           {activeWall.pattern === 'twoTone' && (
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {(['upperColor', 'lowerColor'] as ColorFieldKey[]).map((field) => {
-                  const color = getFieldColor(field)
-                  return (
-                    <div key={field} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-semibold text-slate-700">{COLOR_FIELDS[field]}</div>
-                          <div className="text-xs text-slate-500">{color.hex} · {color.name}</div>
-                        </div>
-                        {renderHslPopover(field, COLOR_FIELDS[field])}
+            <div className="space-y-3">
+              {(['upperColor', 'lowerColor'] as ColorFieldKey[]).map((field) => {
+                const color = getFieldColor(field)
+                const isOpen = openColorFields.has(field)
+                return (
+                  <div key={field} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={() => toggleColorField(field)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                    >
+                      <span
+                        className="h-5 w-5 flex-shrink-0 rounded-full border border-slate-200 shadow-sm"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold text-slate-700">{COLOR_FIELDS[field]}</div>
+                        <div className="text-xs text-slate-400">{color.hex} · {color.name}</div>
                       </div>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">From Photo</div>
-                          {renderColorSwatches(combinedPalette, color.hex, (paletteColor) => handlePaletteSelect(field, paletteColor))}
-                        </div>
-                        <div>
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Common Wall Colors · {commonWallPalette.length}</div>
-                          {renderCommonSectionPanels(
-                            color.hex,
-                            (paletteColor) => handlePaletteSelect(field, paletteColor),
-                            'grid max-h-44 grid-cols-8 gap-2 overflow-y-auto pr-1',
-                            'h-8 w-8 rounded-xl'
-                          )}
-                        </div>
+                      {renderHslPopover(field, COLOR_FIELDS[field])}
+                      <ChevronDown className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-slate-200 px-4 pb-4 pt-3">
+                        {renderCommonSectionPanels(
+                          color.hex,
+                          (paletteColor) => handlePaletteSelect(field, paletteColor),
+                          'grid max-h-52 grid-cols-10 gap-2 overflow-y-auto',
+                          'h-8 w-8 rounded-xl'
+                        )}
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                <label className="text-sm font-semibold text-slate-700">Split Percentage</label>
+                    )}
+                  </div>
+                )
+              })}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-slate-700">Split</label>
+                  <span className="text-xs text-slate-500">Upper {activeWall.splitPercentage}% / Lower {100 - activeWall.splitPercentage}%</span>
+                </div>
                 <input
                   type="range"
                   min={10}
                   max={90}
                   value={activeWall.splitPercentage}
                   onChange={(event) => setSplitPercentage(activeWall.id, Number(event.target.value))}
-                  className="mt-3 w-full"
+                  className="mt-2 w-full"
                 />
-                <div className="mt-2 text-xs text-slate-600">Upper: {activeWall.splitPercentage}% / Lower: {100 - activeWall.splitPercentage}%</div>
               </div>
             </div>
           )}
 
           {activeWall.pattern === 'stripe' && (
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-3">
-                {(['topColor', 'middleColor', 'bottomColor'] as ColorFieldKey[]).map((field) => {
-                  const color = getFieldColor(field)
-                  return (
-                    <div key={field} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="mb-3 flex items-center justify-between">
+            <div className="space-y-3">
+              {(['topColor', 'middleColor', 'bottomColor'] as ColorFieldKey[]).map((field) => {
+                const color = getFieldColor(field)
+                const isOpen = openColorFields.has(field)
+                return (
+                  <div key={field} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={() => toggleColorField(field)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                    >
+                      <span
+                        className="h-5 w-5 flex-shrink-0 rounded-full border border-slate-200 shadow-sm"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      <div className="flex-1">
                         <div className="text-sm font-semibold text-slate-700">{COLOR_FIELDS[field]}</div>
-                        {renderHslPopover(field, COLOR_FIELDS[field])}
+                        <div className="text-xs text-slate-400">{color.hex} · {color.name}</div>
                       </div>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">From Photo</div>
-                          {renderColorSwatches(combinedPalette, color.hex, (paletteColor) => handlePaletteSelect(field, paletteColor))}
-                        </div>
-                        <div>
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Common Wall Colors · {commonWallPalette.length}</div>
-                          {renderCommonSectionPanels(
-                            color.hex,
-                            (paletteColor) => handlePaletteSelect(field, paletteColor),
-                            'grid max-h-44 grid-cols-8 gap-2 overflow-y-auto pr-1',
-                            'h-8 w-8 rounded-xl'
-                          )}
-                        </div>
+                      {renderHslPopover(field, COLOR_FIELDS[field])}
+                      <ChevronDown className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-slate-200 px-4 pb-4 pt-3">
+                        {renderCommonSectionPanels(
+                          color.hex,
+                          (paletteColor) => handlePaletteSelect(field, paletteColor),
+                          'grid max-h-52 grid-cols-10 gap-2 overflow-y-auto',
+                          'h-8 w-8 rounded-xl'
+                        )}
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                <label className="text-sm font-semibold text-slate-700">Stripe Width</label>
+                    )}
+                  </div>
+                )
+              })}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-slate-700">Stripe Width</label>
+                  <span className="text-xs text-slate-500">Middle {activeWall.stripePercentage}%</span>
+                </div>
                 <input
                   type="range"
                   min={5}
                   max={35}
                   value={activeWall.stripePercentage}
                   onChange={(event) => setStripePercentage(activeWall.id, Number(event.target.value))}
-                  className="mt-3 w-full"
+                  className="mt-2 w-full"
                 />
-                <div className="mt-2 text-xs text-slate-600">Middle stripe width: {activeWall.stripePercentage}%</div>
               </div>
             </div>
           )}
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-700">Ceiling / Trim Palette</div>
-            <p className="mt-2 text-xs text-slate-500">Choose a neutral or extracted wall color for finish elements.</p>
-          </div>
           {activeElement === 'ceiling' ? (
             <div className="space-y-4">
-              <div>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">From Photo</div>
-                {renderColorSwatches(combinedPalette, ceilingColor?.hex ?? '', (color) => setCeilingColor(color), 'h-12 w-12 rounded-2xl')}
-              </div>
               <div>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Common Wall Colors · {commonWallPalette.length}</div>
                 {renderCommonSectionPanels(
@@ -604,10 +657,6 @@ export function ColorEditor() {
           ) : (
             <div className="space-y-4">
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">From Photo</div>
-                {renderColorSwatches(combinedPalette, trimColor?.hex ?? '', (color) => setTrimColor(color), 'h-12 w-12 rounded-2xl')}
-              </div>
-              <div>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Common Wall Colors · {commonWallPalette.length}</div>
                 {renderCommonSectionPanels(
                   trimColor?.hex ?? '',
@@ -629,6 +678,7 @@ export function ColorEditor() {
           )}
         </div>
       )}
+      </div>}
     </div>
   )
 }

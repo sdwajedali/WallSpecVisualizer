@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { useRoomStore } from '../store/useRoomStore'
 
@@ -26,6 +27,7 @@ export function PainterGuide() {
   const cardRef = useRef<HTMLDivElement | null>(null)
   const [copyStatus, setCopyStatus] = useState('')
   const [downloadStatus, setDownloadStatus] = useState('')
+  const [isPanelOpen, setIsPanelOpen] = useState(false)
 
   const guideText = useMemo(() => {
     const lines: string[] = []
@@ -86,14 +88,23 @@ export function PainterGuide() {
 
   return (
     <div className="sticky top-6 space-y-4">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-soft">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div>
+      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-soft">
+        <button
+          type="button"
+          onClick={() => setIsPanelOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-2"
+        >
+          <div className="text-left">
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Painter&apos;s Specification Sheet</h2>
-            <p className="text-xs text-slate-500">Copy or download the finalized contractor reference.</p>
+            <p className="mt-0.5 text-xs text-slate-500">Copy or download the finalized contractor reference.</p>
           </div>
-        </div>
-        <div ref={cardRef} className="rounded-[2rem] border border-slate-200 bg-white p-5 text-sm leading-6 text-slate-700">
+          <ChevronDown
+            className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${isPanelOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {isPanelOpen && (
+          <div className="mt-4 space-y-4">
+          <div ref={cardRef} className="rounded-[2rem] border border-slate-200 bg-white p-5 text-sm leading-6 text-slate-700">
           <div className="mb-4 text-xs uppercase tracking-[0.24em] text-slate-500">OFFICIAL PAINTER&apos;S GUIDE</div>
           <div className="mb-4 text-base font-semibold text-slate-900">{roomType}</div>
           <div className="space-y-3 text-sm text-slate-700">
@@ -140,6 +151,8 @@ export function PainterGuide() {
             {downloadStatus || 'Download PNG'}
           </button>
         </div>
+        </div>
+        )}
       </div>
     </div>
   )
